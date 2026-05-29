@@ -1,0 +1,48 @@
+name: Create Release with Dataset Zip
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create_release_with_dataset_zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create Dataset Zip
+        run: zip -r dataset.zip csv/
+
+      - name: Get Last Commit Message
+        id: last_commit
+        run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+
+      - name: Get Last Commit Date
+        id: last_commit_date
+        run: echo "date=$(git log -1 --format=%cd --date=format:'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        with:
+          tag_name: ${{ steps.last_commit_date.outputs.date }}
+          release_name: Release ${{ steps.last_commit_date.outputs.date }}
+          body: |
+            This release contains the dataset updated on: ${{ steps.last_commit_date.outputs.date }}
+
+            Last commit message: ${{ steps.last_commit.outputs.message }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Dataset Zip to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dataset.zip
+          asset_name: dataset.zip
+          asset_content_type: application/zip

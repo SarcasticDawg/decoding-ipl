@@ -1,0 +1,62 @@
+name: Transform JSON to CSV
+
+on:
+  push:
+    paths:
+      - 'json/ipl_match/**' 
+  workflow_dispatch:  # Allows manual triggering
+  
+  workflow_run:
+    workflows: ["Process IPL Data"]
+    types: [completed]
+
+
+
+jobs:
+  transform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+          architecture: 'x64'
+
+      - name: Convert line endings to Unix-style
+        run: |
+          sed -i 's/\r$//' scripts/Ballbyball.py
+          sed -i 's/\r$//' scripts/MatchInfo.py
+        
+
+      - name: Set execute permissions for Python script
+        run: |
+          chmod +x scripts/Ballbyball.py
+          chmod +x scripts/MatchInfo.py
+
+      - name: Run Python Script
+        run: |
+          "scripts/Ballbyball.py"
+          "scripts/MatchInfo.py"
+
+      - name: Create json directory
+        run: mkdir -p csv
+
+      - name: Move CSV file to csv directory
+        run: mv *.csv csv/
+        
+      - name: Get current date and time
+        id: timestamp
+        run: echo "::set-output name=date::$(TZ=Asia/Kolkata date +'%Y-%m-%d %H:%M:%S')"
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "ritesh-ojha"
+          git config --global user.email "reeteshojha5@gmail.com"
+          git add csv/
+          git commit -m "Dataset updated at - $(echo ${{ steps.timestamp.outputs.date }}) (IST)"
+          git push --force https://github.com/ritesh-ojha/IPL-DATASET.git main
+        continue-on-error: true  

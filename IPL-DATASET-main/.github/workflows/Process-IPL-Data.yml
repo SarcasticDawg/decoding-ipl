@@ -1,0 +1,98 @@
+name: Process IPL Data
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # Runs every 6 hours
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  process_data:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+    
+      - name: Set up Git
+        run: |
+          git config --global user.name "ritesh-ojha"
+          git config --global user.email "reeteshojha5@gmail.com"
+          git config --global url.https://${{ secrets.PAT_TOKEN }}@github.com/.insteadOf https://github.com/
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Create json and zip directory
+        run: mkdir -p json/ipl_match zip
+
+      # Capture list of files before download and extraction
+      - name: List files before
+        id: list_files_before
+        run: |
+          ls -A json/ipl_match > files_before.txt
+
+      - name: Download IPL dataset zip
+        run: wget https://cricsheet.org/downloads/ipl_json.zip
+
+      - name: Unzip IPL dataset
+        run: unzip -q ipl_json.zip
+
+      - name: Move files to folders
+        run: |
+          mv *.json json/ipl_match
+          echo "Json Files moved successfully"
+          mv *.zip zip/
+          echo "Zip Files moved successfully"
+
+      - name: Get current date and time
+        id: timestamp
+        run: echo "::set-output name=date::$(TZ=Asia/Kolkata date +'%Y-%m-%d %H:%M:%S')"
+
+      - name: Configure Git
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+          architecture: 'x64'
+
+      # Capture list of files after download and extraction
+      - name: List files after
+        id: list_files_after
+        run: |
+          ls -A json/ipl_match > files_after.txt
+          wc -l files_after.txt
+
+      - name: Check for new files
+        id: new_files
+        run: |
+          diff_files=$(diff files_before.txt files_after.txt)
+          diff_status=$?
+          if [ $diff_status -eq 0 ]; then
+            echo "No differences found."
+            exit 0
+          elif [ $diff_status -eq 1 ]; then
+            echo "Differences found."
+            exit 1
+          else
+            echo "Error encountered while comparing files."
+            exit 2
+          fi
+        continue-on-error: true
+
+        # Commit and push changes if new files are detected
+      - name: Commit and push changeshanges
+        if: steps.new_files.outcome == 'failure'
+        run: |
+          git init
+          git add json/ipl_match zip/
+          git commit -m "files updated at - $(echo ${{ steps.timestamp.outputs.date }}) (IST)"
+          git push --force https://github.com/ritesh-ojha/IPL-DATASET.git main
+      
+      # Trigger Transform Workflow
+      - name: Trigger Transform Workflow
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github.everest-preview+json" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/repos/ritesh-ojha/IPL-DATASET/dispatches \
+            -d '{"event_type": "trigger-transform-workflow"}'

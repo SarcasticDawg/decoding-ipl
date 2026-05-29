@@ -1,0 +1,53 @@
+name: scripts Teams JSON to CSV
+
+on:
+  push:
+    paths:
+      - 'json/ipl_team_info/**' 
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  team-info:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+          architecture: 'x64'
+
+      - name: Install dependencies
+        run: pip install pandas
+
+      - name: Convert line endings to Unix-style
+        run: |
+          sed -i 's/\r$//' scripts/TeamInfo.py
+        
+
+      - name: Set execute permissions for Python script
+        run: |
+          chmod +x scripts/TeamInfo.py
+
+      - name: Run Python Script
+        run: |
+          "scripts/TeamInfo.py"
+
+      - name: Move CSV file to csv directory
+        run: mv *.csv csv/
+        
+      - name: Get current date and time
+        id: timestamp
+        run: echo "::set-output name=date::$(TZ=Asia/Kolkata date +'%Y-%m-%d %H:%M:%S')"
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "ritesh-ojha"
+          git config --global user.email "reeteshojha5@gmail.com"
+          git add csv/
+          git commit -m "Dataset updated at - $(echo ${{ steps.timestamp.outputs.date }}) (IST)"
+          git push --force https://github.com/ritesh-ojha/IPL-DATASET.git main
+        continue-on-error: true

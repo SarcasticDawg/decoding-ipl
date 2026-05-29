@@ -1,0 +1,563 @@
+#!/usr/bin/env python3
+"""
+IPL Impact Analyzer — Flask backend
+Run: python app.py
+Then open: http://localhost:5000
+"""
+import os, re, json, math, yaml
+from dataclasses import dataclass, asdict
+from collections import defaultdict, deque
+from pathlib import Path
+from flask import Flask, jsonify, send_from_directory, abort
+
+app = Flask(__name__, static_folder="static", static_url_path="")
+DATA_DIR = Path(__file__).parent / "data"
+README   = Path(__file__).parent / "README.txt"
+
+# ── Match index (built once from README) ─────────────────────────────────────
+def _build_index():
+    index = []
+    if not README.exists():
+        return index
+    with open(README) as f:
+        for line in f:
+            m = re.match(r"(\d{4}-\d{2}-\d{2}) - \w+ - IPL - \w+ - (\d+) - (.+)", line)
+            if m:
+                date, mid, teams_str = m.group(1), m.group(2), m.group(3).strip()
+                parts = teams_str.split(" vs ", 1)
+                index.append({
+                    "id":    mid,
+                    "date":  date,
+                    "year":  date[:4],
+                    "team1": parts[0].strip(),
+                    "team2": parts[1].strip() if len(parts) > 1 else "",
+                })
+    return index
+
+MATCH_INDEX = _build_index()
+BY_YEAR = {}
+for m in MATCH_INDEX:
+    BY_YEAR.setdefault(m["year"], []).append(m)
+
+@dataclass
+class MatchState:
+    innings: int
+    batting_team: str
+    bowling_team: str
+    runs: int
+    wickets: int
+    balls: int
+    target: int | None = None
+
+    @property
+    def balls_remaining(self):
+        return max(0, 120 - self.balls)
+
+    @property
+    def wickets_in_hand(self):
+        return max(0, 10 - self.wickets)
+
+    @property
+    def crr(self):
+        return self.runs * 6 / self.balls if self.balls else 0.0
+
+    @property
+    def runs_remaining(self):
+        if self.target is None:
+            return None
+        return max(0, self.target - self.runs)
+
+    @property
+    def rrr(self):
+        if self.target is None:
+            return 0.0
+        if self.runs >= self.target:
+            return 0.0
+        return self.runs_remaining * 6 / self.balls_remaining if self.balls_remaining else 99.0
+
+def _sigmoid(x):
+    return 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, x))))
+
+def _phase(ball_number):
+    over = ball_number / 6
+    if over < 6:
+        return "powerplay"
+    if over < 15:
+        return "middle"
+    return "death"
+
+def _is_legal_ball(ball):
+    return "wides" not in ball.get("extras", {})
+
+def _wicket_count(ball):
+    wickets = ball.get("wickets")
+    if isinstance(wickets, list):
+        return len(wickets)
+    return 1 if ball.get("wicket") else 0
+
+def _wicket_entries(ball):
+    wickets = ball.get("wickets")
+    if isinstance(wickets, list):
+        return wickets
+    wicket = ball.get("wicket")
+    return [wicket] if wicket else []
+
+def _player_team(players_map, name):
+    for team, players in players_map.items():
+        if name in players:
+            return team
+    return ""
+
+def pressure_index(state):
+    """Normalized 0..1 pressure with smooth logistic scaling."""
+    wicket_stress = 1 - (state.wickets_in_hand / 10)
+    ball_stress = 1 - (state.balls_remaining / 120)
+    if state.target is None:
+        scoring_stress = max(0.0, min(2.0, (8.5 - state.crr) / 8.5))
+    else:
+        scoring_stress = max(0.0, min(3.0, state.rrr / max(state.crr, 1.0) - 1))
+    raw = 1.30 * scoring_stress + 0.85 * wicket_stress + 0.55 * ball_stress - 0.75
+    return round(_sigmoid(raw), 4)
+
+def win_probability(state):
+    """
+    Explainable logistic baseline. Returns probability that the current
+    batting team wins, or reaches a winning first-innings total.
+    """
+    if state.wickets >= 10:
+        return 0.01
+    if state.target is not None and state.runs >= state.target:
+        return 0.99
+    if state.target is not None and state.balls_remaining <= 0:
+        return 0.99 if state.runs >= state.target else 0.01
+
+    if state.target is None:
+        projected = state.runs + state.crr * state.balls_remaining / 6
+        wicket_factor = (state.wickets_in_hand - 5) / 5
+        phase_factor = (state.balls / 120) - 0.5
+        z = -0.10 + 0.030 * (projected - 170) + 0.70 * wicket_factor + 0.25 * phase_factor
+    else:
+        rr_gap = state.crr - state.rrr
+        wickets = state.wickets_in_hand
+        resource = state.balls_remaining / 120
+        runs_left = state.runs_remaining or 0
+        z = 0.15 + 0.36 * rr_gap + 0.28 * (wickets - 5) + 1.10 * resource - 0.018 * runs_left
+    return round(max(0.01, min(0.99, _sigmoid(z))), 4)
+
+def _flatten_deliveries(innings_raw):
+    innings = []
+    for idx, inn_block in enumerate(innings_raw):
+        for _, inn_data in inn_block.items():
+            rows = []
+            for delivery in inn_data.get("deliveries", []):
+                for ball_id, ball in delivery.items():
+                    rows.append((ball_id, ball))
+            innings.append({"index": idx + 1, "team": inn_data.get("team", ""), "deliveries": rows})
+    return innings
+
+ADVANCED_ANALYTICS_SPEC = {
+    "architecture": [
+        "data layer: Cricsheet YAML loader",
+        "state engine: MatchState runs/wickets/balls/CRR/RRR/resources",
+        "analytics layer: win_probability, pressure_index, momentum EWMA",
+        "aggregation layer: phase dominance, player WP decomposition, turning points",
+    ],
+    "win_probability": {
+        "implemented": "Explainable logistic baseline, O(1) per ball.",
+        "logistic_regression": {
+            "features": ["runs_remaining", "balls_remaining", "wickets_in_hand", "crr", "rrr", "rr_gap"],
+            "training": "Create one row per historical ball, label by eventual winner, fit calibrated logistic regression.",
+            "complexity": "training O(n*d); inference O(d)",
+            "real_time": "Excellent, deterministic sub-millisecond updates.",
+        },
+        "monte_carlo": {
+            "features": ["current state", "phase scoring distribution", "wicket probability by phase"],
+            "training": "Estimate empirical run and wicket distributions from past balls.",
+            "complexity": "O(simulations * balls_remaining)",
+            "real_time": "Good with 500-2000 simulations; slower but useful as a calibration benchmark.",
+        },
+        "gradient_boosted_trees": {
+            "features": ["same as logistic plus venue/team/player/phase context"],
+            "training": "Fit tree ensemble on historical ball states and outcome labels.",
+            "complexity": "inference O(trees * depth)",
+            "real_time": "Good, less explainable than logistic but stronger with enough data.",
+        },
+    },
+    "pressure": "sigmoid(1.30*RRR_CRR_stress + 0.85*wicket_stress + 0.55*ball_stress - 0.75)",
+    "momentum": "12-legal-ball rolling run rate plus EWMA smoothing; emit events for acceleration > 2.4 RPO or >=2 wickets in window.",
+    "turning_points": "Rank balls by abs(win_probability_delta)*100 + pressure*8.",
+    "data_structures": [
+        "MatchState dataclass: innings, batting_team, bowling_team, runs, wickets, balls, target",
+        "timeline event dict: state, pressure, WP before/after, delta, actors",
+        "player impact dict keyed by player: batting_wp, bowling_wp, fielding_wp, total_wp",
+        "phase aggregate dict keyed by team then phase: runs, balls, wickets, dots",
+    ],
+    "performance": "Live features are O(1) per ball except final top-K sorts, O(p log p + e log e). Memory is O(balls + players + phases).",
+    "pseudocode": {
+        "win_probability_update": "before=WP(state); apply_ball(); after=WP(new_state); delta=after-before",
+        "momentum_detection": "window.add(runs,wicket); rolling_rr=sum(window.runs)*6/N; ewma=a*rolling+(1-a)*ewma; emit if acceleration/window wickets cross thresholds",
+        "pressure_calculation": "normalize RRR/CRR, wickets lost, balls used; combine weighted sum; pass through sigmoid",
+    },
+}
+
+def compute_advanced_analytics(innings_raw, info):
+    players_map = info.get("players", {})
+    teams = info.get("teams", [])
+    flat = _flatten_deliveries(innings_raw)
+    first_total = None
+    timeline = []
+    player_delta = defaultdict(lambda: {
+        "batting_wp": 0.0, "bowling_wp": 0.0, "fielding_wp": 0.0,
+        "events": 0, "team": ""
+    })
+    phase_stats = defaultdict(lambda: defaultdict(lambda: {
+        "runs": 0, "balls": 0, "wickets": 0, "dots": 0
+    }))
+    momentum_events = []
+    pressure_curve = []
+    win_curve = []
+    recent_runs = deque(maxlen=12)
+    recent_wickets = deque(maxlen=12)
+    ewma_rr = 0.0
+    alpha = 0.35
+
+    for inn in flat:
+        batting_team = inn["team"]
+        bowling_team = next((t for t in teams if t != batting_team), "")
+        target = first_total + 1 if first_total is not None else None
+        runs = wickets = legal_balls = 0
+
+        for raw_ball_id, ball in inn["deliveries"]:
+            before = MatchState(inn["index"], batting_team, bowling_team, runs, wickets, legal_balls, target)
+            before_wp = win_probability(before)
+            runs_obj = ball.get("runs", {})
+            total_r = int(runs_obj.get("total", 0))
+            bat_r = int(runs_obj.get("batsman", runs_obj.get("batter", 0)))
+            wicket_n = _wicket_count(ball)
+            legal = _is_legal_ball(ball)
+            phase = _phase(legal_balls)
+            batsman = ball.get("batsman", ball.get("batter", ""))
+            bowler = ball.get("bowler", "")
+
+            runs += total_r
+            wickets += wicket_n
+            if legal:
+                legal_balls += 1
+
+            after = MatchState(inn["index"], batting_team, bowling_team, runs, wickets, legal_balls, target)
+            after_wp = win_probability(after)
+            delta = round(after_wp - before_wp, 4)
+            pressure = pressure_index(after)
+
+            if batsman:
+                player_delta[batsman]["team"] = batting_team
+                player_delta[batsman]["batting_wp"] += delta * (0.72 if bat_r else 0.35)
+                player_delta[batsman]["events"] += 1
+            if bowler:
+                player_delta[bowler]["team"] = _player_team(players_map, bowler) or bowling_team
+                player_delta[bowler]["bowling_wp"] += -delta * (0.58 if (bat_r == 0 or wicket_n) else 0.25)
+                player_delta[bowler]["events"] += 1
+            for wicket in _wicket_entries(ball):
+                kind = wicket.get("kind", "")
+                for fld in wicket.get("fielders", []):
+                    fname = fld if isinstance(fld, str) else fld.get("name", "")
+                    if not fname:
+                        continue
+                    player_delta[fname]["team"] = _player_team(players_map, fname)
+                    player_delta[fname]["fielding_wp"] += -delta * (0.45 if "run out" in kind else 0.30)
+                    player_delta[fname]["events"] += 1
+
+            if legal:
+                ps = phase_stats[batting_team][phase]
+                ps["runs"] += total_r
+                ps["balls"] += 1
+                ps["wickets"] += wicket_n
+                if total_r == 0:
+                    ps["dots"] += 1
+
+                recent_runs.append(total_r)
+                recent_wickets.append(wicket_n)
+                rolling_rr = sum(recent_runs) * 6 / len(recent_runs)
+                prev_ewma = ewma_rr
+                ewma_rr = rolling_rr if ewma_rr == 0 else alpha * rolling_rr + (1 - alpha) * ewma_rr
+                wicket_cluster = sum(recent_wickets)
+                acceleration = ewma_rr - prev_ewma
+                intensity = min(1.0, abs(acceleration) / 4 + wicket_cluster * 0.18)
+                if len(recent_runs) >= 6 and (acceleration > 2.4 or wicket_cluster >= 2):
+                    momentum_events.append({
+                        "ball": f"{raw_ball_id}", "team": batting_team,
+                        "type": "scoring acceleration" if acceleration > 2.4 else "wicket cluster",
+                        "intensity": round(intensity, 3),
+                        "rolling_run_rate": round(rolling_rr, 2),
+                        "ewma_run_rate": round(ewma_rr, 2),
+                        "wickets_last_12": wicket_cluster,
+                    })
+
+            event = {
+                "ball": f"{raw_ball_id}", "innings": inn["index"],
+                "batting_team": batting_team, "bowling_team": bowling_team,
+                "batter": batsman, "bowler": bowler, "runs": total_r,
+                "bat_runs": bat_r, "wickets": wicket_n, "phase": phase,
+                "state": asdict(after), "pressure": pressure,
+                "win_probability_before": before_wp,
+                "win_probability_after": after_wp,
+                "win_probability_delta": delta,
+            }
+            timeline.append(event)
+            pressure_curve.append([len(timeline), pressure])
+            win_curve.append([len(timeline), after_wp, batting_team])
+
+        if first_total is None:
+            first_total = runs
+
+    phase_dominance = []
+    for team, phases in phase_stats.items():
+        for phase, s in phases.items():
+            balls = s["balls"] or 1
+            rr = s["runs"] * 6 / balls
+            dot_pct = s["dots"] / balls
+            score = rr * 0.55 + s["wickets"] * 1.45 - dot_pct * 2.0
+            phase_dominance.append({
+                "team": team, "phase": phase, "run_rate": round(rr, 2),
+                "wickets": s["wickets"], "dot_ball_pct": round(dot_pct * 100, 1),
+                "dominance_score": round(score, 2),
+            })
+    phase_dominance.sort(key=lambda x: x["dominance_score"], reverse=True)
+
+    player_impact = []
+    for name, s in player_delta.items():
+        total = s["batting_wp"] + s["bowling_wp"] + s["fielding_wp"]
+        player_impact.append({
+            "name": name, "team": s["team"],
+            "batting_wp": round(s["batting_wp"], 4),
+            "bowling_wp": round(s["bowling_wp"], 4),
+            "fielding_wp": round(s["fielding_wp"], 4),
+            "total_wp": round(total, 4),
+            "events": s["events"],
+        })
+    player_impact.sort(key=lambda x: abs(x["total_wp"]), reverse=True)
+
+    turning_points = sorted(
+        [
+            {
+                "ball": e["ball"], "innings": e["innings"], "team": e["batting_team"],
+                "batter": e["batter"], "bowler": e["bowler"],
+                "event": f"{e['runs']} run(s), {e['wickets']} wicket(s)",
+                "wp_delta": e["win_probability_delta"],
+                "pressure": e["pressure"],
+                "score": round(abs(e["win_probability_delta"]) * 100 + e["pressure"] * 8, 2),
+            }
+            for e in timeline
+            if abs(e["win_probability_delta"]) >= 0.045 or e["pressure"] >= 0.82
+        ],
+        key=lambda x: x["score"],
+        reverse=True,
+    )[:8]
+
+    return {
+        "summary": {
+            "model": "hybrid_rule_logistic_v1",
+            "balls_processed": len(timeline),
+            "final_pressure": pressure_curve[-1][1] if pressure_curve else 0,
+            "final_win_probability": win_curve[-1][1] if win_curve else 0.5,
+        },
+        "win_probability_curve": win_curve,
+        "pressure_curve": pressure_curve,
+        "momentum_events": momentum_events[-10:],
+        "turning_points": turning_points,
+        "phase_dominance": phase_dominance,
+        "player_impact_decomposition": player_impact[:10],
+        "algorithm_spec": ADVANCED_ANALYTICS_SPEC,
+    }
+
+# ── Impact engine ─────────────────────────────────────────────────────────────
+def compute_impact(match_id: str):
+    fp = DATA_DIR / f"{match_id}.yaml"
+    if not fp.exists():
+        return None
+    with open(fp) as f:
+        data = yaml.safe_load(f)
+
+    info        = data.get("info", {})
+    innings_raw = data.get("innings", [])
+    teams       = info.get("teams", [])
+    winner      = info.get("outcome", {}).get("winner", "")
+    by          = info.get("outcome", {}).get("by", {})
+    pom         = info.get("player_of_match", [])
+    dates       = info.get("dates", [])
+    players_map = info.get("players", {})
+
+    bat, bowl, field = {}, {}, {}
+    innings_out = []
+
+    for inn_block in innings_raw:
+        for _, inn_data in inn_block.items():
+            team      = inn_data.get("team", "")
+            deliveries = inn_data.get("deliveries", [])
+            inn_runs   = 0
+            inn_wkts   = 0
+
+            for delivery in deliveries:
+                for ball_id, ball in delivery.items():
+                    over = int(float(str(ball_id)))
+                    if over < 6:    pb, pw = 1.1, 1.2
+                    elif over < 15: pb, pw = 1.0, 1.0
+                    else:           pb, pw = 1.3, 1.3
+
+                    batsman   = ball.get("batsman", ball.get("batter", ""))
+                    bowler    = ball.get("bowler", "")
+                    runs      = ball.get("runs", {})
+                    bat_r     = runs.get("batsman", runs.get("batter", 0))
+                    total_r   = runs.get("total", 0)
+                    extras    = runs.get("extras", 0)
+                    wicket    = ball.get("wicket")
+                    pressure  = 1.0 + inn_wkts * 0.05
+                    inn_runs += total_r
+
+                    # batting
+                    if batsman:
+                        b = bat.setdefault(batsman, dict(runs=0,balls=0,fours=0,sixes=0,dots=0,impact=0.0,team=team))
+                        b["runs"] += bat_r; b["balls"] += 1
+                        if bat_r == 4: b["fours"] += 1
+                        if bat_r == 6: b["sixes"] += 1
+                        if bat_r == 0: b["dots"]  += 1
+                        c = bat_r * pressure * pb
+                        if bat_r == 4: c += 1
+                        if bat_r == 6: c += 2
+                        if bat_r == 0: c -= 0.3
+                        b["impact"] += c
+
+                    # bowling
+                    if bowler:
+                        b = bowl.setdefault(bowler, dict(balls=0,runs=0,wickets=0,dots=0,impact=0.0,team=""))
+                        b["balls"] += 1
+                        b["runs"]  += max(0, total_r - extras)
+                        if bat_r == 0 and extras == 0: b["dots"] += 1
+                        c = 0.0
+                        if bat_r == 0 and extras == 0: c += pw
+                        c -= max(0, total_r - extras) * 0.4
+                        if wicket:
+                            c += 15 * pressure * pw
+                            inn_wkts += 1
+                            b["wickets"] += 1
+                        b["impact"] += c
+                        if not b["team"]:
+                            for t, pl in players_map.items():
+                                if bowler in pl: b["team"] = t; break
+
+                    # fielding
+                    if wicket:
+                        kind = wicket.get("kind", "")
+                        for fld in wicket.get("fielders", []):
+                            fname = fld if isinstance(fld, str) else fld.get("name", "")
+                            if not fname: continue
+                            fe = field.setdefault(fname, dict(impact=0.0))
+                            if "caught"   in kind: fe["impact"] += 5.0
+                            elif "stumped" in kind: fe["impact"] += 6.0
+                            elif "run out" in kind: fe["impact"] += 4.0
+
+            innings_out.append(dict(team=team, runs=inn_runs, wickets=inn_wkts, balls=len(deliveries)))
+
+    # combined impact
+    combined = {}
+    for n,s in bat.items():   combined[n] = combined.get(n,0) + s["impact"]
+    for n,s in bowl.items():  combined[n] = combined.get(n,0) + s["impact"]
+    for n,s in field.items(): combined[n] = combined.get(n,0) + s["impact"]
+    if not combined: return None
+
+    vals = list(combined.values())
+    lo, hi = min(vals), max(vals)
+    def norm(v):
+        return 5.0 if hi == lo else round(10 * math.sqrt((v-lo)/(hi-lo)), 2)
+
+    ranked = sorted(((norm(v), n) for n,v in combined.items()), reverse=True)
+
+    def team_of(name):
+        t = bat.get(name,{}).get("team","") or bowl.get(name,{}).get("team","")
+        if not t:
+            for tm, pl in players_map.items():
+                if name in pl: return tm
+        return t
+
+    top_players = []
+    for score, name in ranked[:10]:
+        b  = bat.get(name,{})
+        bw = bowl.get(name,{})
+        runs=b.get("runs",0); bf=b.get("balls",0)
+        sr=round(runs/bf*100,1) if bf else 0
+        wkts=bw.get("wickets",0); bb=bw.get("balls",0); br=bw.get("runs",0)
+        eco=round(br/(bb/6),2) if bb else 0
+        fours=b.get("fours",0); sixes=b.get("sixes",0)
+        if runs>10 and runs >= wkts*12:
+            role="bat"; stat=f"{runs}({bf}) SR:{sr} | {fours}×4 {sixes}×6"
+        elif wkts>0:
+            role="bowl"; stat=f"{wkts}/{br} ({bb//6}.{bb%6} ov) Eco:{eco}"
+        else:
+            role="bowl"; stat=f"0/{br} ({bb//6}.{bb%6} ov) Eco:{eco}"
+        top_players.append(dict(name=name,team=team_of(name),score=score,role=role,stat=stat,
+            runs=runs,balls=bf,sr=sr,wkts=wkts,fours=fours,sixes=sixes,eco=eco,dots=b.get("dots",0)))
+
+    innings_summary = [
+        dict(team=i["team"], score=f"{i['runs']}/{i['wickets']}", overs=f"{i['balls']//6}.{i['balls']%6}")
+        for i in innings_out
+    ]
+
+    if by.get("runs"):     result = f"{winner} won by {by['runs']} runs"
+    elif by.get("wickets"):result = f"{winner} won by {by['wickets']} wickets"
+    else:                  result = info.get("outcome",{}).get("result","No result")
+
+    # worm chart data
+    worm = {}
+    for inn_block in innings_raw:
+        for inn_key, inn_data in inn_block.items():
+            team = inn_data.get("team","")
+            cum = 0; balls_done = 0; curve = []
+            for delivery in inn_data.get("deliveries",[]):
+                for _, ball in delivery.items():
+                    cum += ball.get("runs",{}).get("total",0)
+                    balls_done += 1
+                    over_f = round(balls_done/6,2)
+                    curve.append([over_f, cum])
+            worm[team] = curve
+
+    return dict(
+        match_id=match_id,
+        date=str(dates[0]) if dates else "",
+        venue=info.get("venue",""),
+        city=info.get("city",""),
+        teams=teams,
+        winner=winner,
+        result=result,
+        pom=pom,
+        innings=innings_summary,
+        top_players=top_players[:5],
+        motm=top_players[0] if top_players else None,
+        worm=worm,
+        advanced=compute_advanced_analytics(innings_raw, info),
+    )
+
+# ── Routes ────────────────────────────────────────────────────────────────────
+@app.route("/")
+def index():
+    return send_from_directory("static", "index.html")
+
+@app.route("/api/years")
+def api_years():
+    return jsonify(sorted(BY_YEAR.keys(), reverse=True))
+
+@app.route("/api/matches/<year>")
+def api_matches(year):
+    return jsonify(BY_YEAR.get(year, []))
+
+@app.route("/api/analyze/<match_id>")
+def api_analyze(match_id):
+    if not re.match(r"^\d+$", match_id):
+        abort(400)
+    result = compute_impact(match_id)
+    if result is None:
+        abort(404)
+    return jsonify(result)
+
+if __name__ == "__main__":
+    print("🏏  IPL Impact Analyzer running at http://localhost:5000")
+    app.run(debug=False, port=5000)
