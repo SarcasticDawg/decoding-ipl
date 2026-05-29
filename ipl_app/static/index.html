@@ -1198,8 +1198,7 @@ function renderImpactLeaderboard(players) {
   const maxScore = players[0].rating;
   $("impact-container-main").innerHTML = players.map((p, i) => {
     const pct = Math.round((p.rating / maxScore) * 100);
-    const teamLogo = TEAM_ASSETS[_name_key(TEAM_FULL_NAMES[p.team] || p.team)] || "";
-    const imgHtml = teamLogo ? `<img src="${teamLogo}" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">` : "";
+    const imgHtml = p.team_logo ? `<img src="${p.team_logo}" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">` : "";
     
     return `
       <div class="impact-card ${i === 0 ? "motm" : ""}">

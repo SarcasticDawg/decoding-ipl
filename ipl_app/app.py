@@ -576,11 +576,18 @@ def compute_seasonal_impact(year):
             rating = round(max(0.1, min(10.0, 10 * raw / (raw + (match_count * 35)))), 1)
             
             asset = PLAYER_ASSETS.get(_name_key(name), {})
+            
+            # Resolve team logo
+            team_name = data["team"]
+            full_name = TEAM_FULL_NAMES.get(team_name, team_name)
+            team_logo = TEAM_ASSETS.get(_name_key(full_name), "")
+
             results.append({
                 "name": name,
                 "rating": rating,
                 "matches": match_count,
                 "team": data["team"],
+                "team_logo": team_logo,
                 "img": asset.get("img", ""),
                 "role": asset.get("role", "Player")
             })
