@@ -559,6 +559,56 @@
   .empty-sub { font-size: 13px; }
   .error-msg { background: rgba(232,74,74,0.1); border: 1px solid rgba(232,74,74,0.3); border-radius: var(--r-sm); padding: 1rem; font-size: 13px; color: var(--red); }
 
+  .about-btn {
+    position: absolute; top: 2rem; right: 2rem; z-index: 1000;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    color: var(--accent); padding: 10px 20px; border-radius: var(--r-sm);
+    font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;
+    cursor: pointer; transition: all 0.2s; backdrop-filter: blur(5px);
+  }
+  .about-btn:hover { background: var(--accent); color: #000; transform: translateY(-2px); }
+
+  /* About Overlay (Cinematic) */
+  .about-overlay {
+    position: fixed; inset: 0; z-index: 3000;
+    background: transparent; display: none;
+    flex-direction: column; align-items: center;
+    overflow: hidden;
+  }
+  .about-overlay.show { display: flex; }
+  .credits-container {
+    width: 100%; max-width: 900px; height: 100%;
+    mask-image: linear-gradient(transparent, black 25%, black 75%, transparent);
+    -webkit-mask-image: linear-gradient(transparent, black 25%, black 75%, transparent);
+  }
+  .credits-content {
+    padding: 100vh 2rem 50vh;
+    animation: scroll-credits 45s linear infinite;
+    text-align: justify;
+  }
+  .credits-content h1 {
+    font-family: var(--font-head); font-size: 60px; color: var(--accent);
+    text-align: center; margin-bottom: 3rem; text-transform: uppercase;
+    letter-spacing: 10px; text-shadow: 0 0 30px rgba(244,168,40,0.5);
+  }
+  .credits-content p {
+    font-size: 20px; line-height: 1.8; margin-bottom: 2.5rem;
+    color: #fff; text-shadow: 0 4px 12px rgba(0,0,0,0.9);
+    font-weight: 500;
+  }
+  @keyframes scroll-credits {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-100%); }
+  }
+  .close-about-btn {
+    position: fixed; bottom: 2rem;
+    background: var(--accent); color: #000; border: none;
+    padding: 12px 24px; border-radius: 30px; font-weight: 900;
+    text-transform: uppercase; letter-spacing: 2px; cursor: pointer;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-size: 13px;
+  }
+  .hidden-for-about { visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
+
   /* Responsive */
   @media (max-width: 1100px) { .impact-grid { grid-template-columns: repeat(3,1fr); } }
   @media (max-width: 1180px) {
@@ -632,6 +682,7 @@
 <audio id="bgm" src="/assets/bgm.mp3" loop preload="auto"></audio>
 
 <header>
+  <button class="about-btn" onclick="showAbout()">About IPL</button>
   <div class="logo">
     <div class="logo-icon">🏏</div>
     <div>
@@ -808,6 +859,25 @@
   </div>
 </div>
 
+<!-- About IPL Cinematic Credits -->
+<div id="about-overlay" class="about-overlay" onclick="hideAbout()">
+  <div class="credits-container">
+    <div class="credits-content">
+      <h1>Indian Premier League (IPL)</h1>
+      <p>The Indian Premier League (IPL) is one of the most popular and successful cricket tournaments in the world. It was established in 2008 by the Board of Control for Cricket in India (BCCI) with the aim of bringing together the excitement of Twenty20 cricket and professional franchise-based competition. Since its inception, the IPL has transformed the landscape of cricket and has become a global sporting phenomenon.</p>
+      <p>The IPL is played in the T20 format, where each team plays a maximum of 20 overs per innings. The tournament features franchise teams representing different cities across India. Over the years, teams such as Mumbai Indians, Chennai Super Kings, Royal Challengers Bengaluru, and Kolkata Knight Riders have built large fan bases and intense rivalries.</p>
+      <p>One of the key attractions of the IPL is the participation of world-class cricketers from various countries. The tournament allows young Indian players to share the dressing room with international stars, helping them gain valuable experience and exposure. Many players have used the IPL as a platform to showcase their talent and earn opportunities at the international level.</p>
+      <p>The IPL is not only a sporting event but also a major entertainment spectacle. It combines cricket with music, celebrity involvement, and large-scale broadcasting. Millions of viewers watch the matches both in stadiums and on television, making it one of the most-watched sporting leagues globally.</p>
+      <p>Economically, the IPL has had a significant impact on Indian cricket and sports business. It generates substantial revenue through sponsorships, broadcasting rights, ticket sales, and merchandising. The league has also created employment opportunities in sports management, media, marketing, and event organization.</p>
+      <p>Despite facing challenges such as scheduling issues and controversies, the IPL has continued to grow in popularity. Its innovative format, competitive matches, and ability to attract top talent have made it a model for cricket leagues around the world.</p>
+      <p>In conclusion, the Indian Premier League has revolutionized cricket by blending sports, entertainment, and business. It has provided a platform for emerging players, delighted fans with thrilling contests, and elevated the global profile of Indian cricket. Today, the IPL stands as one of the greatest success stories in the history of modern sports.</p>
+      <div style="height: 40vh;"></div>
+      <p style="text-align: center; color: var(--accent); font-weight: 800; letter-spacing: 5px;">THE END</p>
+    </div>
+  </div>
+  <button class="close-about-btn">Close & Return</button>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 
@@ -974,6 +1044,20 @@ function renderStatsTable(rows, cat, isBowling) {
 function closeStats(e) {
   if (e && e.target !== $("stats-overlay") && e.target.className !== "close-btn") return;
   $("stats-overlay").classList.remove("show");
+}
+
+function showAbout() {
+  $("about-overlay").classList.add("show");
+  document.querySelector("header").classList.add("hidden-for-about");
+  document.querySelector(".layout").classList.add("hidden-for-about");
+  document.body.style.overflow = "hidden";
+}
+
+function hideAbout() {
+  $("about-overlay").classList.remove("show");
+  document.querySelector("header").classList.remove("hidden-for-about");
+  document.querySelector(".layout").classList.remove("hidden-for-about");
+  document.body.style.overflow = "auto";
 }
 
 const ABBR = {
