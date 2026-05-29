@@ -730,6 +730,9 @@
       <button class="action-btn" id="points-table-btn" onclick="showPointsTable()" style="padding: 0 14px; height: 42px; font-size: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--r-sm); color: var(--accent); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; gap:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
         <span style="font-size:16px;">🏆</span> Points Table
       </button>
+      <button class="action-btn" id="impact-leaderboard-btn" onclick="showImpactLeaderboard()" style="padding: 0 14px; height: 42px; font-size: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--r-sm); color: var(--accent); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; gap:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+        <span style="font-size:16px;">🔥</span> Impact
+      </button>
     </div>
   </div>
   <div class="field-group">
@@ -767,6 +770,15 @@
 
     <!-- Error -->
     <div class="error-msg" id="error-box" style="display:none"></div>
+
+    <!-- Impact Leaderboard Result -->
+    <div class="result" id="impact-result" style="display:none">
+      <div class="section-head">
+        <span class="section-title" id="impact-title-main">Seasonal Impact Leaderboard</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="impact-grid" id="impact-container-main"></div>
+    </div>
 
     <!-- Points Table Result -->
     <div class="result" id="pt-result" style="display:none">
@@ -1146,6 +1158,62 @@ function renderPT(rows) {
 
 function closePT(e) {
   $("pt-result").style.display = "none";
+}
+
+async function showImpactLeaderboard() {
+  const yr = $("year-sel").value;
+  if (!yr) return alert("Please select a season first.");
+  
+  // Toggle Visibility
+  $("result").style.display = "none";
+  $("stats-result").style.display = "none";
+  $("pt-result").style.display = "none";
+  $("impact-result").style.display = "block";
+  $("empty-state").style.display = "none";
+
+  $("impact-title-main").textContent = `IPL ${yr} Impact Leaderboard`;
+  $("impact-container-main").innerHTML = `
+    <div style="grid-column: 1 / -1; text-align:center; padding: 4rem;">
+      <div class="spin-ring" style="margin: 0 auto 1.5rem;"></div>
+      <div style="color:var(--muted); font-weight:600;">Analyzing full season ball-by-ball data...</div>
+    </div>
+  `;
+
+  try {
+    const r = await fetch(`/api/impact-leaderboard/${yr}`);
+    const data = await r.json();
+    renderImpactLeaderboard(data);
+  } catch (e) {
+    console.error(e);
+    $("impact-container-main").innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding: 4rem; color:var(--red);">Failed to compute seasonal impact.</div>';
+  }
+}
+
+function renderImpactLeaderboard(players) {
+  if (!players || players.length === 0) {
+    $("impact-container-main").innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding: 4rem; color:var(--muted);">No impact data available for this season.</div>';
+    return;
+  }
+
+  const maxScore = players[0].rating;
+  $("impact-container-main").innerHTML = players.map((p, i) => {
+    const pct = Math.round((p.rating / maxScore) * 100);
+    const teamLogo = TEAM_ASSETS[_name_key(TEAM_FULL_NAMES[p.team] || p.team)] || "";
+    const imgHtml = teamLogo ? `<img src="${teamLogo}" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">` : "";
+    
+    return `
+      <div class="impact-card ${i === 0 ? "motm" : ""}">
+        <div class="card-rank">#${i+1} · ${p.role}</div>
+        <div class="card-name">${p.name}</div>
+        <div class="card-team">${imgHtml}${p.team} · ${p.matches} matches</div>
+        <div class="card-score-row">
+          <div class="card-score-num">${p.rating.toFixed(1)}</div>
+          <div class="card-score-label">/10</div>
+        </div>
+        <div class="card-bar"><div class="card-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+    `;
+  }).join("");
 }
 
 function showAbout() {

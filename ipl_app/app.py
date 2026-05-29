@@ -516,6 +516,84 @@ def api_highlights(match_id):
     url = f"https://www.google.com/search?q={quote_plus(query)}"
     return jsonify({"url": url})
 
+def compute_seasonal_impact(year):
+    matches_in_year = [m["id"] for m in BY_YEAR.get(str(year), [])]
+    if not matches_in_year: return []
+    
+    # Load all balls for these matches
+    player_impact = defaultdict(lambda: {"total_raw": 0.0, "matches": set(), "team": "", "role": ""})
+    
+    # Simple version for performance: use a simplified impact score for seasonal aggregation
+    # based on the same principles as the ball-by-ball engine
+    try:
+        with open(BBB_DATA_CSV, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                mid = row.get("ID")
+                if mid not in matches_in_year: continue
+                
+                batsman = row.get("Batter")
+                bowler = row.get("Bowler")
+                runs = int(row.get("BatsmanRun", 0))
+                is_wicket = row.get("IsWicketDelivery") == "1"
+                over = int(row.get("Overs", 0))
+                
+                # Phase weight
+                weight = 1.35 if over < 6 else (1.70 if over >= 15 else 1.25)
+                
+                if batsman:
+                    player_impact[batsman]["matches"].add(mid)
+                    # Base impact from runs
+                    score = runs * 0.8 * weight
+                    if runs == 4: score += 1.0
+                    if runs == 6: score += 2.0
+                    if runs == 0: score -= 0.3
+                    player_impact[batsman]["total_raw"] += score
+                    if not player_impact[batsman]["team"]: player_impact[batsman]["team"] = row.get("BattingTeam")
+
+                if bowler:
+                    player_impact[bowler]["matches"].add(mid)
+                    # Base impact from bowling
+                    score = (1.5 * weight) - (runs * 1.1) # Reward dots/low runs
+                    if is_wicket:
+                        kind = row.get("Kind", "")
+                        if kind in {"bowled", "caught", "lbw", "stumped"}:
+                            score += 15.0 * weight
+                    player_impact[bowler]["total_raw"] += score
+                    # Resolve team for bowler
+                    if not player_impact[bowler]["team"]: 
+                        # We'll try to find the team from our TEAM_ASSETS/MATCH_INDEX if needed, 
+                        # but usually BattingTeam is enough to infer BowlingTeam in a match context.
+                        pass
+
+        results = []
+        for name, data in player_impact.items():
+            match_count = len(data["matches"])
+            if match_count == 0: continue
+            
+            # Normalize and scale to 0-10
+            raw = data["total_raw"]
+            rating = round(max(0.1, min(10.0, 10 * raw / (raw + (match_count * 35)))), 1)
+            
+            asset = PLAYER_ASSETS.get(_name_key(name), {})
+            results.append({
+                "name": name,
+                "rating": rating,
+                "matches": match_count,
+                "team": data["team"],
+                "img": asset.get("img", ""),
+                "role": asset.get("role", "Player")
+            })
+            
+        return sorted(results, key=lambda x: x["rating"], reverse=True)[:50]
+    except Exception as e:
+        print(f"Error computing seasonal impact: {e}")
+        return []
+
+@app.route("/api/impact-leaderboard/<year>")
+def api_impact_leaderboard(year):
+    return jsonify(compute_seasonal_impact(year))
+
 @app.route("/api/points-table/<year>")
 def api_points_table(year):
     pt_file = Path(__file__).parent.parent / "ipl_points_tables" / f"ipl_{year}.csv"
