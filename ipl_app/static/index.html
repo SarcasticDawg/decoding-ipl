@@ -609,8 +609,26 @@
   }
   .hidden-for-about { visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
 
+  /* Integrated Stats & Points Table */
+  .stats-layout-main { display: flex; gap: 2rem; margin-top: 1rem; }
+  .stats-sidebar-main { width: 260px; flex-shrink: 0; }
+  .stats-body-main { flex: 1; min-width: 0; }
+  
+  .stats-sidebar-main, .stats-body-main, #pt-container-main {
+    background: rgba(17,19,24,0.46);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: var(--r);
+    box-shadow: 0 14px 42px rgba(0,0,0,0.28);
+  }
+  .stats-body-main, #pt-container-main { padding: 1.5rem; }
+
   /* Responsive */
-  @media (max-width: 1100px) { .impact-grid { grid-template-columns: repeat(3,1fr); } }
+  @media (max-width: 1100px) { 
+    .impact-grid { grid-template-columns: repeat(3,1fr); }
+    .stats-layout-main { flex-direction: column; }
+    .stats-sidebar-main { width: 100%; }
+  }
   @media (max-width: 1180px) {
     header { min-height: 58vh; }
     .logo { padding: 2.25rem 1.25rem 1rem; }
@@ -750,6 +768,41 @@
     <!-- Error -->
     <div class="error-msg" id="error-box" style="display:none"></div>
 
+    <!-- Points Table Result -->
+    <div class="result" id="pt-result" style="display:none">
+      <div class="section-head">
+        <span class="section-title" id="pt-title-main">Points Table</span>
+        <div class="section-line"></div>
+      </div>
+      <div id="pt-container-main"></div>
+    </div>
+
+    <!-- Seasonal Stats Result -->
+    <div class="result" id="stats-result" style="display:none">
+      <div class="section-head">
+        <span class="section-title" id="stats-title-main">Seasonal Statistics</span>
+        <div class="section-line"></div>
+      </div>
+      <div class="stats-layout-main">
+        <aside class="stats-sidebar-main">
+          <div class="stats-toggle">
+            <div class="toggle-opt">
+              <input type="radio" id="toggle-bat-main" name="stats-type-main" value="bat" checked onchange="refreshStatsNav()">
+              <label for="toggle-bat-main">Batters</label>
+            </div>
+            <div class="toggle-opt">
+              <input type="radio" id="toggle-bowl-main" name="stats-type-main" value="bowl" onchange="refreshStatsNav()">
+              <label for="toggle-bowl-main">Bowlers</label>
+            </div>
+          </div>
+          <nav id="stats-nav-main" class="stats-nav"></nav>
+        </aside>
+        <div class="stats-body-main" id="stats-body-main">
+          <div id="stats-container-main"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Result -->
     <div class="result" id="result">
       <section class="result-slide">
@@ -826,59 +879,6 @@
   </main>
 </div>
 
-<!-- Points Table Overlay -->
-<div id="pt-overlay" class="stats-overlay" onclick="closePT(event)">
-  <div class="stats-content" onclick="event.stopPropagation()" style="max-width: 1000px;">
-    <div class="stats-header">
-      <h2 id="pt-title">Points Table</h2>
-      <button class="close-btn" onclick="closePT(event)">×</button>
-    </div>
-    <div class="stats-body" style="padding: 1.5rem;">
-      <div id="pt-loader" style="text-align:center; padding: 3rem;">
-        <div class="spin-ring" style="margin: 0 auto 1rem;"></div>
-        <div style="color:var(--muted); font-weight:600;">Loading points table...</div>
-      </div>
-      <div id="pt-container"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Seasonal Stats Overlay -->
-<div id="stats-overlay" class="stats-overlay" onclick="closeStats(event)">
-  <div class="stats-content" onclick="event.stopPropagation()">
-    <div class="stats-header">
-      <h2 id="stats-title">Seasonal Statistics</h2>
-      <button class="close-btn" onclick="closeStats(event)">×</button>
-    </div>
-    
-    <div class="stats-layout">
-      <!-- Sidebar -->
-      <aside class="stats-sidebar">
-        <div class="stats-toggle">
-          <div class="toggle-opt">
-            <input type="radio" id="toggle-bat" name="stats-type" value="bat" checked onchange="refreshStatsNav()">
-            <label for="toggle-bat">Batters</label>
-          </div>
-          <div class="toggle-opt">
-            <input type="radio" id="toggle-bowl" name="stats-type" value="bowl" onchange="refreshStatsNav()">
-            <label for="toggle-bowl">Bowlers</label>
-          </div>
-        </div>
-        <nav id="stats-nav" class="stats-nav"></nav>
-      </aside>
-
-      <!-- Main Body -->
-      <div class="stats-body" id="stats-body">
-        <div id="stats-loader" style="text-align:center; padding: 4rem;">
-          <div class="spin-ring" style="margin: 0 auto 1.5rem;"></div>
-          <div style="color:var(--muted); font-weight:600;">Loading seasonal records...</div>
-        </div>
-        <div id="stats-container"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- About IPL Cinematic Credits -->
 <div id="about-overlay" class="about-overlay" onclick="hideAbout()">
   <div class="credits-container">
@@ -914,33 +914,39 @@ async function showSeasonStats() {
   const yr = $("year-sel").value;
   if (!yr) return alert("Please select a season first.");
   
-  $("stats-title").textContent = `IPL ${yr} Statistics`;
-  $("stats-overlay").classList.add("show");
-  $("stats-loader").style.display = "block";
-  $("stats-container").style.display = "none";
-  $("stats-nav").innerHTML = "";
+  // Toggle Visibility
+  $("result").style.display = "none";
+  $("pt-result").style.display = "none";
+  $("stats-result").style.display = "block";
+  $("empty-state").style.display = "none";
+
+  $("stats-title-main").textContent = `IPL ${yr} Statistics`;
+  $("stats-container-main").innerHTML = `
+    <div id="stats-loader-main" style="text-align:center; padding: 4rem;">
+      <div class="spin-ring" style="margin: 0 auto 1.5rem;"></div>
+      <div style="color:var(--muted); font-weight:600;">Loading seasonal records...</div>
+    </div>
+  `;
+  $("stats-nav-main").innerHTML = "";
 
   try {
     const r = await fetch(`/api/stats/${yr}`);
     const data = await r.json();
     window._currentStats = data; // { bat: {...}, bowl: {...} }
     
-    $("stats-loader").style.display = "none";
-    $("stats-container").style.display = "block";
-    
+    $("stats-container-main").innerHTML = "";
     refreshStatsNav();
     
   } catch (e) {
     console.error(e);
-    $("stats-loader").style.display = "none";
-    $("stats-container").innerHTML = '<div style="text-align:center; padding: 4rem; color:var(--red); font-size:18px;">Error connecting to the database.</div>';
+    $("stats-container-main").innerHTML = '<div style="text-align:center; padding: 4rem; color:var(--red); font-size:18px;">Error connecting to the database.</div>';
   }
 }
 
 function refreshStatsNav() {
-  const type = document.querySelector('input[name="stats-type"]:checked').value;
+  const type = document.querySelector('input[name="stats-type-main"]:checked').value;
   const data = (window._currentStats && window._currentStats[type]) || {};
-  const nav = $("stats-nav");
+  const nav = $("stats-nav-main");
   nav.innerHTML = "";
   
   const allCats = Object.keys(data).sort();
@@ -983,7 +989,7 @@ function refreshStatsNav() {
 
 function renderStatsTable(rows, cat, isBowling) {
   if (!rows || rows.length === 0) {
-    $("stats-container").innerHTML = '<div style="text-align:center; padding: 4rem; color:var(--muted); font-size:16px;">No records found for this category.</div>';
+    $("stats-container-main").innerHTML = '<div style="text-align:center; padding: 4rem; color:var(--muted); font-size:16px;">No records found for this category.</div>';
     return;
   }
   
@@ -1057,39 +1063,45 @@ function renderStatsTable(rows, cat, isBowling) {
   });
   
   html += `</tbody></table>`;
-  $("stats-container").innerHTML = html;
-  $("stats-body").scrollTop = 0;
+  $("stats-container-main").innerHTML = html;
 }
 
 function closeStats(e) {
-  if (e && e.target !== $("stats-overlay") && e.target.className !== "close-btn") return;
-  $("stats-overlay").classList.remove("show");
+  $("stats-result").style.display = "none";
 }
 
 async function showPointsTable() {
   const yr = $("year-sel").value;
   if (!yr) return alert("Please select a season first.");
   
-  $("pt-title").textContent = `IPL ${yr} Points Table`;
-  $("pt-overlay").classList.add("show");
-  $("pt-loader").style.display = "block";
-  $("pt-container").innerHTML = "";
+  // Toggle Visibility
+  $("result").style.display = "none";
+  $("stats-result").style.display = "none";
+  $("pt-result").style.display = "block";
+  $("empty-state").style.display = "none";
+
+  $("pt-title-main").textContent = `IPL ${yr} Points Table`;
+  $("pt-container-main").innerHTML = `
+    <div id="pt-loader-main" style="text-align:center; padding: 3rem;">
+      <div class="spin-ring" style="margin: 0 auto 1rem;"></div>
+      <div style="color:var(--muted); font-weight:600;">Loading points table...</div>
+    </div>
+  `;
 
   try {
     const r = await fetch(`/api/points-table/${yr}`);
     const data = await r.json();
-    $("pt-loader").style.display = "none";
+    $("pt-container-main").innerHTML = "";
     renderPT(data);
   } catch (e) {
     console.error(e);
-    $("pt-loader").style.display = "none";
-    $("pt-container").innerHTML = '<div style="text-align:center; padding: 3rem; color:var(--red);">Failed to load points table.</div>';
+    $("pt-container-main").innerHTML = '<div style="text-align:center; padding: 3rem; color:var(--red);">Failed to load points table.</div>';
   }
 }
 
 function renderPT(rows) {
   if (!rows || rows.length === 0) {
-    $("pt-container").innerHTML = '<div style="text-align:center; padding: 3rem; color:var(--muted);">No data available for this season.</div>';
+    $("pt-container-main").innerHTML = '<div style="text-align:center; padding: 3rem; color:var(--muted);">No data available for this season.</div>';
     return;
   }
 
@@ -1129,12 +1141,11 @@ function renderPT(rows) {
   });
 
   html += `</tbody></table>`;
-  $("pt-container").innerHTML = html;
+  $("pt-container-main").innerHTML = html;
 }
 
 function closePT(e) {
-  if (e && e.target !== $("pt-overlay") && e.target.className !== "close-btn") return;
-  $("pt-overlay").classList.remove("show");
+  $("pt-result").style.display = "none";
 }
 
 function showAbout() {
@@ -1289,6 +1300,8 @@ async function analyze() {
   $("empty-state").style.display = "none";
   $("error-box").style.display = "none";
   $("result").classList.remove("show");
+  $("stats-result").style.display = "none";
+  $("pt-result").style.display = "none";
   $("spinner").classList.add("show");
   $("analyze-btn").disabled = true;
 

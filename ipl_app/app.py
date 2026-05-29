@@ -28,6 +28,26 @@ PLAYER_FILE_CANDIDATES = [Path(__file__).parent / "ipl_players.json", Path(__fil
 def _name_key(name):
     return re.sub(r"[^a-z0-9]", "", str(name).lower())
 
+TEAM_FULL_NAMES = {
+    "MI": "Mumbai Indians",
+    "CSK": "Chennai Super Kings",
+    "RCB": "Royal Challengers Bengaluru",
+    "KKR": "Kolkata Knight Riders",
+    "DC": "Delhi Capitals",
+    "DD": "Delhi Daredevils",
+    "SRH": "Sunrisers Hyderabad",
+    "RR": "Rajasthan Royals",
+    "PBKS": "Punjab Kings",
+    "KXIP": "Kings XI Punjab",
+    "LSG": "Lucknow Super Giants",
+    "GT": "Gujarat Titans",
+    "RPS": "Rising Pune Supergiant",
+    "GL": "Gujarat Lions",
+    "PW": "Pune Warriors",
+    "DCH": "Deccan Chargers",
+    "KTK": "Kochi Tuskers Kerala"
+}
+
 def _player_aliases(name):
     parts = [p for p in re.split(r"\s+", str(name).strip()) if p]
     if not parts: return set()
@@ -507,7 +527,9 @@ def api_points_table(year):
             data = list(csv.DictReader(f))
             for row in data:
                 team_name = row.get("TEAM", "")
-                row["LOGO"] = TEAM_ASSETS.get(_name_key(team_name), "")
+                # Resolve abbreviation to full name if exists
+                full_name = TEAM_FULL_NAMES.get(team_name, team_name)
+                row["LOGO"] = TEAM_ASSETS.get(_name_key(full_name), "")
             return jsonify(data)
     except Exception:
         return jsonify([])
