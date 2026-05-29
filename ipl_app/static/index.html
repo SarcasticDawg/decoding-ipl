@@ -1093,14 +1093,27 @@ function renderPT(rows) {
     return;
   }
 
-  const headers = Object.keys(rows[0]).filter(h => h !== "Unnamed: 1");
+  const columns = [
+    "POS",
+    "TEAM",
+    "P",
+    "W",
+    "L",
+    "NR",
+    "NRR",
+    "FOR",
+    "AGAINST",
+    "PTS",
+    "RECENT FORM"
+  ];
+
   let html = `<table class="stats-table-full"><thead><tr>`;
-  headers.forEach(h => html += `<th>${h}</th>`);
+  columns.forEach(h => html += `<th>${h}</th>`);
   html += `</tr></thead><tbody>`;
 
   rows.forEach(row => {
     html += `<tr>`;
-    headers.forEach(h => {
+    columns.forEach(h => {
       let val = row[h] || "—";
       let style = "";
       if (h === "TEAM") style = "color:var(--accent); font-weight:700;";
