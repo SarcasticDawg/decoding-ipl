@@ -709,6 +709,9 @@
       <button class="action-btn" id="season-stats-btn" onclick="showSeasonStats()" style="padding: 0 14px; height: 42px; font-size: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--r-sm); color: var(--accent); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; gap:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
         <span style="font-size:16px;">📊</span> Stats
       </button>
+      <button class="action-btn" id="points-table-btn" onclick="showPointsTable()" style="padding: 0 14px; height: 42px; font-size: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--r-sm); color: var(--accent); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; gap:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+        <span style="font-size:16px;">🏆</span> Points Table
+      </button>
     </div>
   </div>
   <div class="field-group">
@@ -821,6 +824,23 @@
 
     </div>
   </main>
+</div>
+
+<!-- Points Table Overlay -->
+<div id="pt-overlay" class="stats-overlay" onclick="closePT(event)">
+  <div class="stats-content" onclick="event.stopPropagation()" style="max-width: 1000px;">
+    <div class="stats-header">
+      <h2 id="pt-title">Points Table</h2>
+      <button class="close-btn" onclick="closePT(event)">×</button>
+    </div>
+    <div class="stats-body" style="padding: 1.5rem;">
+      <div id="pt-loader" style="text-align:center; padding: 3rem;">
+        <div class="spin-ring" style="margin: 0 auto 1rem;"></div>
+        <div style="color:var(--muted); font-weight:600;">Loading points table...</div>
+      </div>
+      <div id="pt-container"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Seasonal Stats Overlay -->
@@ -1044,6 +1064,59 @@ function renderStatsTable(rows, cat, isBowling) {
 function closeStats(e) {
   if (e && e.target !== $("stats-overlay") && e.target.className !== "close-btn") return;
   $("stats-overlay").classList.remove("show");
+}
+
+async function showPointsTable() {
+  const yr = $("year-sel").value;
+  if (!yr) return alert("Please select a season first.");
+  
+  $("pt-title").textContent = `IPL ${yr} Points Table`;
+  $("pt-overlay").classList.add("show");
+  $("pt-loader").style.display = "block";
+  $("pt-container").innerHTML = "";
+
+  try {
+    const r = await fetch(`/api/points-table/${yr}`);
+    const data = await r.json();
+    $("pt-loader").style.display = "none";
+    renderPT(data);
+  } catch (e) {
+    console.error(e);
+    $("pt-loader").style.display = "none";
+    $("pt-container").innerHTML = '<div style="text-align:center; padding: 3rem; color:var(--red);">Failed to load points table.</div>';
+  }
+}
+
+function renderPT(rows) {
+  if (!rows || rows.length === 0) {
+    $("pt-container").innerHTML = '<div style="text-align:center; padding: 3rem; color:var(--muted);">No data available for this season.</div>';
+    return;
+  }
+
+  const headers = Object.keys(rows[0]).filter(h => h !== "Unnamed: 1");
+  let html = `<table class="stats-table-full"><thead><tr>`;
+  headers.forEach(h => html += `<th>${h}</th>`);
+  html += `</tr></thead><tbody>`;
+
+  rows.forEach(row => {
+    html += `<tr>`;
+    headers.forEach(h => {
+      let val = row[h] || "—";
+      let style = "";
+      if (h === "TEAM") style = "color:var(--accent); font-weight:700;";
+      if (h === "PTS") style = "font-weight:800; color:#fff;";
+      html += `<td style="${style}">${val}</td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table>`;
+  $("pt-container").innerHTML = html;
+}
+
+function closePT(e) {
+  if (e && e.target !== $("pt-overlay") && e.target.className !== "close-btn") return;
+  $("pt-overlay").classList.remove("show");
 }
 
 function showAbout() {

@@ -496,6 +496,19 @@ def api_highlights(match_id):
     url = f"https://www.google.com/search?q={quote_plus(query)}"
     return jsonify({"url": url})
 
+@app.route("/api/points-table/<year>")
+def api_points_table(year):
+    pt_file = Path(__file__).parent.parent / "ipl_points_tables" / f"ipl_{year}.csv"
+    if not pt_file.exists():
+        return jsonify([])
+    
+    try:
+        with open(pt_file, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            return jsonify(list(reader))
+    except Exception:
+        return jsonify([])
+
 @app.route("/api/stats/<year>")
 def api_stats(year):
     base_dir = Path(__file__).parent.parent / "IPL" / str(year)
