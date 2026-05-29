@@ -406,6 +406,152 @@
     text-shadow: 0 1px 9px rgba(0,0,0,0.78);
   }
 
+  /* Season Stats Overlay */
+  .stats-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0,0,0,0.88); backdrop-filter: blur(15px);
+    display: none; align-items: center; justify-content: center;
+    padding: 2rem;
+  }
+  .stats-overlay.show { display: flex; }
+  .stats-content {
+    background: #111318; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: var(--r); width: 100%; max-width: 1300px;
+    max-height: 92vh; display: flex; flex-direction: column;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.7); overflow: hidden;
+    position: relative;
+  }
+  .stats-header {
+    padding: 1.75rem 2.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.04), transparent);
+  }
+  .stats-header h2 { font-size: 26px; color: var(--accent); font-family: var(--font-head); letter-spacing: 0.5px; }
+  .close-btn {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+    color: var(--muted); width: 44px; height: 44px; border-radius: 50%;
+    font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .close-btn:hover { background: rgba(232,74,74,0.15); color: var(--red); border-color: rgba(232,74,74,0.3); transform: rotate(90deg); }
+  
+  .stats-layout { display: flex; flex: 1; overflow: hidden; }
+  
+  /* Sidebar */
+  .stats-sidebar {
+    width: 280px; background: rgba(0,0,0,0.2);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    display: flex; flex-direction: column;
+  }
+  
+  /* Toggle */
+  .stats-toggle {
+    display: flex; padding: 1.5rem; gap: 4px;
+    background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .toggle-opt {
+    flex: 1; position: relative;
+  }
+  .toggle-opt input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .toggle-opt label {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px; border-radius: 6px; cursor: pointer;
+    font-size: 11px; font-weight: 800; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    transition: all 0.2s; border: 1px solid transparent;
+  }
+  .toggle-opt input:checked + label {
+    background: rgba(244,168,40,0.1); color: var(--accent);
+    border-color: rgba(244,168,40,0.2);
+  }
+  .toggle-opt label::before {
+    content: ''; width: 12px; height: 12px; border: 2px solid var(--muted);
+    border-radius: 50%; transition: all 0.2s;
+  }
+  .toggle-opt input:checked + label::before {
+    border-color: var(--accent); background: radial-gradient(var(--accent) 3px, transparent 4px);
+  }
+
+  /* Category List */
+  .stats-nav { flex: 1; overflow-y: auto; padding: 1rem 0; }
+  .nav-group-label {
+    padding: 1.5rem 1.5rem 0.75rem; font-size: 11px; font-weight: 800;
+    color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 2px;
+  }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 1.5rem; cursor: pointer; color: var(--text);
+    font-size: 13px; font-weight: 600; border-left: 3px solid transparent;
+    transition: all 0.2s;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: #fff; }
+  .nav-item.active {
+    background: rgba(7,147,110,0.1); color: #07936e;
+    border-left-color: #07936e;
+  }
+  .nav-item.active::after { content: '›'; font-size: 20px; font-weight: 400; }
+
+  .stats-body {
+    padding: 2.5rem; overflow-y: auto; flex: 1;
+    background: radial-gradient(circle at top left, rgba(244,168,40,0.03), transparent 40%);
+  }
+  .stats-category-title {
+    font-size: 20px; margin-bottom: 1.5rem; color: #fff;
+    border-left: 5px solid var(--accent); padding-left: 15px;
+    font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .stats-table-full { 
+    width: 100%; border-collapse: separate; border-spacing: 0; 
+    font-size: 14px; margin-bottom: 2rem;
+  }
+  .stats-table-full th {
+    background: rgba(255,255,255,0.05); color: var(--muted); 
+    padding: 14px 16px; text-align: left; font-weight: 700;
+    text-transform: uppercase; font-size: 11px; letter-spacing: 1px;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+  }
+  .stats-table-full td {
+    padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: var(--text);
+  }
+  .stats-table-full tr:hover td { background: rgba(255,255,255,0.02); }
+  .stats-table-full tr:first-child td { color: var(--accent); font-weight: 700; }
+  .stats-table-full td:first-child { font-weight: 800; color: #fff; }
+
+  /* Winner Spotlight */
+  .winner-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+    padding: 1.5rem 2rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 2rem;
+    position: relative; overflow: hidden;
+  }
+  .winner-card::before {
+    content: 'WINNER'; position: absolute; right: -20px; top: 10px;
+    font-size: 80px; font-weight: 900; color: rgba(255,255,255,0.03);
+    pointer-events: none; transform: rotate(-5deg);
+  }
+  .winner-img-wrap {
+    width: 100px; height: 100px; border-radius: 50%;
+    background: var(--surface3); border: 3px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; box-shadow: 0 0 30px rgba(244,168,40,0.2);
+  }
+  .winner-info { flex: 1; }
+  .winner-label { 
+    font-size: 11px; font-weight: 800; letter-spacing: 2px; color: var(--muted); 
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .winner-name { font-size: 32px; font-weight: 800; color: #fff; font-family: var(--font-head); }
+  .winner-stat-big { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; }
+  .winner-val { font-size: 44px; font-weight: 900; color: var(--accent); font-family: var(--font-mono); }
+  .winner-unit { font-size: 14px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+
+  .winner-card.orange { border-color: rgba(244,168,40,0.3); background: linear-gradient(135deg, rgba(244,168,40,0.1), transparent); }
+  .winner-card.orange .winner-img-wrap { border-color: #f4a828; box-shadow: 0 0 30px rgba(244,168,40,0.3); }
+  .winner-card.purple { border-color: rgba(155,114,232,0.3); background: linear-gradient(135deg, rgba(155,114,232,0.1), transparent); }
+  .winner-card.purple .winner-img-wrap { border-color: #9b72e8; box-shadow: 0 0 30px rgba(155,114,232,0.3); }
+  .winner-card.purple .winner-val { color: #9b72e8; }
+
   /* Empty / error */
   .empty { text-align: center; padding: 5rem 0; color: var(--muted); }
   .empty-icon { font-size: 48px; margin-bottom: 1rem; }
@@ -509,6 +655,9 @@
       <select id="year-sel" onchange="loadMatches()">
         <option value="">— select year —</option>
       </select>
+      <button class="action-btn" id="season-stats-btn" onclick="showSeasonStats()" style="padding: 0 14px; height: 42px; font-size: 11px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); border-radius: var(--r-sm); color: var(--accent); cursor: pointer; transition: all 0.2s; display:flex; align-items:center; gap:6px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+        <span style="font-size:16px;">📊</span> Stats
+      </button>
     </div>
   </div>
   <div class="field-group">
@@ -623,8 +772,209 @@
   </main>
 </div>
 
+<!-- Seasonal Stats Overlay -->
+<div id="stats-overlay" class="stats-overlay" onclick="closeStats(event)">
+  <div class="stats-content" onclick="event.stopPropagation()">
+    <div class="stats-header">
+      <h2 id="stats-title">Seasonal Statistics</h2>
+      <button class="close-btn" onclick="closeStats(event)">×</button>
+    </div>
+    
+    <div class="stats-layout">
+      <!-- Sidebar -->
+      <aside class="stats-sidebar">
+        <div class="stats-toggle">
+          <div class="toggle-opt">
+            <input type="radio" id="toggle-bat" name="stats-type" value="bat" checked onchange="refreshStatsNav()">
+            <label for="toggle-bat">Batters</label>
+          </div>
+          <div class="toggle-opt">
+            <input type="radio" id="toggle-bowl" name="stats-type" value="bowl" onchange="refreshStatsNav()">
+            <label for="toggle-bowl">Bowlers</label>
+          </div>
+        </div>
+        <nav id="stats-nav" class="stats-nav"></nav>
+      </aside>
+
+      <!-- Main Body -->
+      <div class="stats-body" id="stats-body">
+        <div id="stats-loader" style="text-align:center; padding: 4rem;">
+          <div class="spin-ring" style="margin: 0 auto 1.5rem;"></div>
+          <div style="color:var(--muted); font-weight:600;">Loading seasonal records...</div>
+        </div>
+        <div id="stats-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
+
+// ── Seasonal Stats ────────────────────────────────────────────
+const BATTING_KEYS = ['most runs', 'highest score', 'highest avg', 'highest sr', 'most hundreds', 'most fifties', 'most fours', 'most sixes', 'most nineties'];
+const BOWLING_KEYS = ['most wickets', 'best bowling', 'lowest avg', 'lowest sr', 'lowest econ', 'most 5wickets'];
+
+const CAT_RENAMES = {
+  'most runs': 'Orange Cap',
+  'most wickets': 'Purple Cap'
+};
+
+async function showSeasonStats() {
+  const yr = $("year-sel").value;
+  if (!yr) return alert("Please select a season first.");
+  
+  $("stats-title").textContent = `IPL ${yr} Statistics`;
+  $("stats-overlay").classList.add("show");
+  $("stats-loader").style.display = "block";
+  $("stats-container").style.display = "none";
+  $("stats-nav").innerHTML = "";
+
+  try {
+    const r = await fetch(`/api/stats/${yr}`);
+    const data = await r.json();
+    window._currentStats = data; // { bat: {...}, bowl: {...} }
+    
+    $("stats-loader").style.display = "none";
+    $("stats-container").style.display = "block";
+    
+    refreshStatsNav();
+    
+  } catch (e) {
+    console.error(e);
+    $("stats-loader").style.display = "none";
+    $("stats-container").innerHTML = '<div style="text-align:center; padding: 4rem; color:var(--red); font-size:18px;">Error connecting to the database.</div>';
+  }
+}
+
+function refreshStatsNav() {
+  const type = document.querySelector('input[name="stats-type"]:checked').value;
+  const data = (window._currentStats && window._currentStats[type]) || {};
+  const nav = $("stats-nav");
+  nav.innerHTML = "";
+  
+  const allCats = Object.keys(data).sort();
+  const label = type === 'bat' ? 'Batting' : 'Bowling';
+  const pinKey = type === 'bat' ? 'most runs' : 'most wickets';
+  
+  // Filter and prioritize pinned key (Orange/Purple Cap)
+  let filtered = allCats.slice();
+  filtered.sort((a, b) => {
+    if (a.toLowerCase() === pinKey) return -1;
+    if (b.toLowerCase() === pinKey) return 1;
+    return a.localeCompare(b);
+  });
+  
+  if (filtered.length === 0) {
+    nav.innerHTML = '<div style="padding:1.5rem; font-size:11px; color:var(--muted);">No data available.</div>';
+    renderStatsTable([], "");
+    return;
+  }
+
+  const groupLabel = document.createElement("div");
+  groupLabel.className = "nav-group-label";
+  groupLabel.textContent = label;
+  nav.appendChild(groupLabel);
+
+  filtered.forEach((cat, idx) => {
+    const displayTitle = CAT_RENAMES[cat.toLowerCase()] || cat;
+    const item = document.createElement("div");
+    item.className = "nav-item" + (idx === 0 ? " active" : "");
+    item.textContent = displayTitle;
+    item.onclick = () => {
+      document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
+      item.classList.add("active");
+      renderStatsTable(data[cat], displayTitle, type === 'bowl');
+    };
+    nav.appendChild(item);
+    if (idx === 0) renderStatsTable(data[cat], displayTitle, type === 'bowl');
+  });
+}
+
+function renderStatsTable(rows, cat, isBowling) {
+  if (!rows || rows.length === 0) {
+    $("stats-container").innerHTML = '<div style="text-align:center; padding: 4rem; color:var(--muted); font-size:16px;">No records found for this category.</div>';
+    return;
+  }
+  
+  const rawHeaders = Object.keys(rows[0]);
+  const catLower = cat.toLowerCase();
+  const nameKeys = ['PLAYER', 'BATTER', 'BOWLER'];
+  
+  // Define preferred column orders
+  const BATTING_ORDER = ['PLAYER', 'BATTER', 'MATCHES', 'INNS', 'RUNS', 'AVG', 'SR', '4S', '6S'];
+  const BOWLING_ORDER = ['PLAYER', 'BOWLER', 'MATCHES', 'OVERS', 'OVS', 'BALLS', 'WKTS', 'AVG', 'RUNS', '4-FERS', '5-FERS', 'BBI', 'ECON'];
+  const preferred = isBowling ? BOWLING_ORDER : BATTING_ORDER;
+
+  // Sort headers: Name first, then prioritized stats, then others
+  const headers = rawHeaders.sort((a, b) => {
+    const aUpper = a.toUpperCase();
+    const bUpper = b.toUpperCase();
+    const aIdx = preferred.indexOf(aUpper);
+    const bIdx = preferred.indexOf(bUpper);
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  // Spotlight Logic
+  const topPlayer = rows[0];
+  const playerName = topPlayer[rawHeaders.find(h => nameKeys.includes(h.toUpperCase()))] || 'Unknown';
+  const mainStatKey = rawHeaders.find(h => ['RUNS', 'WKTS', '6S', '4S', 'AVG', 'SCORE'].includes(h.toUpperCase()));
+  const mainStatVal = topPlayer[mainStatKey] || '—';
+  
+  let theme = '';
+  if (catLower.includes('orange')) theme = 'orange';
+  else if (catLower.includes('purple')) theme = 'purple';
+
+  let html = `<div class="winner-card ${theme}">
+    <div class="winner-img-wrap">${isBowling ? '🏏' : '🏏'}</div>
+    <div class="winner-info">
+      <div class="winner-label">Season Leader • ${cat}</div>
+      <div class="winner-name">${playerName}</div>
+      <div class="winner-stat-big">
+        <span class="winner-val">${mainStatVal}</span>
+        <span class="winner-unit">${mainStatKey || ''}</span>
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="stats-category-title">${cat}</div>`;
+  html += `<table class="stats-table-full"><thead><tr>`;
+  headers.forEach(h => html += `<th>${h.toUpperCase()}</th>`);
+  html += `</tr></thead><tbody>`;
+  
+  rows.forEach((row, rowIdx) => {
+    const isFirstRow = rowIdx === 0;
+    html += `<tr style="${isFirstRow ? 'background: rgba(244,168,40,0.08);' : ''}">`;
+    headers.forEach(h => {
+      let val = row[h] || '0';
+      const hUpper = h.toUpperCase();
+      const isName = nameKeys.includes(hUpper);
+      const isHighlight = ['RUNS', 'WKTS', 'SR', 'AVG', '6S', '4S', 'BBI', 'ECON'].includes(hUpper);
+      
+      let style = '';
+      if (isFirstRow) {
+        style = isName ? 'color: var(--accent); font-weight: 800;' : 'color: var(--accent); font-weight: 700;';
+      } else if (isHighlight) {
+        style = 'color: rgba(232,234,240,0.9);';
+      }
+      
+      html += `<td style="${style}">${val}</td>`;
+    });
+    html += `</tr>`;
+  });
+  
+  html += `</tbody></table>`;
+  $("stats-container").innerHTML = html;
+  $("stats-body").scrollTop = 0;
+}
+
+function closeStats(e) {
+  if (e && e.target !== $("stats-overlay") && e.target.className !== "close-btn") return;
+  $("stats-overlay").classList.remove("show");
+}
 
 const ABBR = {
   "Mumbai Indians":"MI","Chennai Super Kings":"CSK","Royal Challengers Bangalore":"RCB",

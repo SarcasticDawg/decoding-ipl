@@ -496,6 +496,36 @@ def api_highlights(match_id):
     url = f"https://www.google.com/search?q={quote_plus(query)}"
     return jsonify({"url": url})
 
+@app.route("/api/stats/<year>")
+def api_stats(year):
+    base_dir = Path(__file__).parent.parent / "IPL" / str(year)
+    if not base_dir.exists():
+        return jsonify({"bat": {}, "bowl": {}})
+    
+    results = {"bat": {}, "bowl": {}}
+    
+    # Load Batting Stats
+    bat_dir = base_dir / "Batting"
+    if bat_dir.exists():
+        for csv_file in bat_dir.glob("*.csv"):
+            category = csv_file.stem.replace("_", " ").title()
+            try:
+                with open(csv_file, newline="", encoding="utf-8") as f:
+                    results["bat"][category] = list(csv.DictReader(f))
+            except: continue
+            
+    # Load Bowling Stats
+    bowl_dir = base_dir / "Bowling"
+    if bowl_dir.exists():
+        for csv_file in bowl_dir.glob("*.csv"):
+            category = csv_file.stem.replace("_", " ").title()
+            try:
+                with open(csv_file, newline="", encoding="utf-8") as f:
+                    results["bowl"][category] = list(csv.DictReader(f))
+            except: continue
+            
+    return jsonify(results)
+
 @app.route("/")
 def index(): return send_from_directory("static", "index.html")
 @app.route("/api/years")
