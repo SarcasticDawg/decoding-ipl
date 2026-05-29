@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPL Impact Analyzer — Flask backend
+Decoding IPL — Flask backend
 """
 import os, re, json, math, yaml, zipfile, csv
 from dataclasses import dataclass, asdict
@@ -578,5 +578,5 @@ def api_analyze(match_id):
     return jsonify(result)
 
 if __name__ == "__main__":
-    print("🏏  IPL Impact Analyzer running at http://localhost:5000")
+    print("🏏  Decoding IPL running at http://localhost:5000")
     app.run(debug=False, port=5000)
