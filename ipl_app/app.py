@@ -504,8 +504,11 @@ def api_points_table(year):
     
     try:
         with open(pt_file, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            return jsonify(list(reader))
+            data = list(csv.DictReader(f))
+            for row in data:
+                team_name = row.get("TEAM", "")
+                row["LOGO"] = TEAM_ASSETS.get(_name_key(team_name), "")
+            return jsonify(data)
     except Exception:
         return jsonify([])
 

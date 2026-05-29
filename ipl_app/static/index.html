@@ -1116,7 +1116,12 @@ function renderPT(rows) {
     columns.forEach(h => {
       let val = row[h] || "—";
       let style = "";
-      if (h === "TEAM") style = "color:var(--accent); font-weight:700;";
+      if (h === "TEAM") {
+        style = "color:var(--accent); font-weight:700; display:flex; align-items:center; gap:10px;";
+        const logo = row["LOGO"];
+        const logoHtml = logo ? `<img src="${logo}" style="width:24px;height:24px;object-fit:contain;">` : "";
+        val = `${logoHtml} <span>${val}</span>`;
+      }
       if (h === "PTS") style = "font-weight:800; color:#fff;";
       html += `<td style="${style}">${val}</td>`;
     });
