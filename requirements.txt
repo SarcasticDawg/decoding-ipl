@@ -1,2 +1,4 @@
 flask
 pyyaml
+gunicorn
+playwright
