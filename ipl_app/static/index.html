@@ -43,13 +43,16 @@
   .video-background {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     z-index: 0; pointer-events: none; overflow: hidden;
+    background: #000;
   }
   .video-background iframe {
-    width: 100vw; height: 56.25vw; /* 16:9 aspect ratio */
-    min-height: 100vh; min-width: 177.77vh; /* 16:9 aspect ratio */
+    /* Scale and crop to hide YouTube UI elements at edges */
+    width: 115vw; height: 64.68vw; /* 16:9 ratio * 1.15 scale */
+    min-height: 115vh; min-width: 204.44vh; /* 16:9 ratio * 1.15 scale */
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    filter: saturate(0.96) contrast(0.98) brightness(0.65);
+    filter: saturate(0.96) contrast(0.98) brightness(0.60);
+    border: none;
   }
   header, .layout { position: relative; z-index: 2; }
 
