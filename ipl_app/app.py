@@ -299,7 +299,14 @@ def compute_scorecards(innings_raw, info):
             for bw in bowlers.values():
                 asset = PLAYER_ASSETS.get(_name_key(bw["name"]), {})
                 bw["img"], bw["role"] = asset.get("img", ""), asset.get("role", "")
-            cards.append({"team": batting_team, "team_logo": TEAM_ASSETS.get(_name_key(batting_team), ""), "opponent": bowling_team, "opponent_logo": TEAM_ASSETS.get(_name_key(bowling_team), ""), "score": f"{total}-{wickets}", "runs": total, "wickets": wickets, "overs": _format_overs(legal_balls), "run_rate": round(total / (legal_balls / 6), 2) if legal_balls else 0.0, "batting": ordered_batters, "bowling": sorted(bowlers.values(), key=lambda b: b["balls"], reverse=True), "extras": {"total": sum(extras_breakdown.values())}, "did_not_bat": []})
+            
+            dnb = []
+            for p in players_map.get(batting_team, []):
+                if p not in batters:
+                    asset = PLAYER_ASSETS.get(_name_key(p), {})
+                    dnb.append({"name": p, "img": asset.get("img", ""), "profile_url": _profile_url(p)})
+
+            cards.append({"team": batting_team, "team_logo": TEAM_ASSETS.get(_name_key(batting_team), ""), "opponent": bowling_team, "opponent_logo": TEAM_ASSETS.get(_name_key(bowling_team), ""), "score": f"{total}-{wickets}", "runs": total, "wickets": wickets, "overs": _format_overs(legal_balls), "run_rate": round(total / (legal_balls / 6), 2) if legal_balls else 0.0, "batting": ordered_batters, "bowling": sorted(bowlers.values(), key=lambda b: b["balls"], reverse=True), "extras": {"total": sum(extras_breakdown.values())}, "did_not_bat": dnb})
     return cards
 
 def compute_advanced_analytics(innings_raw, info):
@@ -347,7 +354,19 @@ def compute_advanced_analytics(innings_raw, info):
             dot_pct = s["dots"] / (s["balls"] or 1)
             p_dom.append({"team": t, "phase": p, "run_rate": round(rr, 2), "performance": f"{s['runs']}-{s['wickets']}", "wickets": s["wickets"], "dot_ball_pct": round(dot_pct * 100, 1), "dominance_score": round(rr * 0.55 + s["wickets"] * 1.45 - dot_pct * 2.0, 2)})
     p_dom.sort(key=lambda x: (x["phase"]=="powerplay", x["phase"]=="middle", x["phase"]=="death"), reverse=True)
-    p_impact = sorted([{"name": n, "team": s["team"], "batting_wp": round(s["batting_wp"], 4), "bowling_wp": round(s["bowling_wp"], 4), "total_wp": round(s["batting_wp"] + s["bowling_wp"], 4)} for n, s in player_delta.items()], key=lambda x: abs(x["total_wp"]), reverse=True)
+    p_impact = []
+    for n, s in player_delta.items():
+        asset = PLAYER_ASSETS.get(_name_key(n), {})
+        p_impact.append({
+            "name": n, 
+            "team": s["team"], 
+            "batting_wp": round(s["batting_wp"], 4), 
+            "bowling_wp": round(s["bowling_wp"], 4), 
+            "total_wp": round(s["batting_wp"] + s["bowling_wp"], 4),
+            "img": asset.get("img", ""),
+            "profile_url": _profile_url(n)
+        })
+    p_impact.sort(key=lambda x: abs(x["total_wp"]), reverse=True)
     cands = []
     for e in timeline:
         d_wp, a_wp, pr = e["win_probability_delta"], abs(e["win_probability_delta"]), e["pressure"]
@@ -652,7 +671,13 @@ def api_stats(year):
             category = csv_file.stem.replace("_", " ").title()
             try:
                 with open(csv_file, newline="", encoding="utf-8") as f:
-                    results["bat"][category] = list(csv.DictReader(f))
+                    rows = list(csv.DictReader(f))
+                    for r in rows:
+                        p_name = r.get("PLAYER") or r.get("BATTER") or r.get("BOWLER", "")
+                        asset = PLAYER_ASSETS.get(_name_key(p_name), {})
+                        r["img"] = asset.get("img", "")
+                        r["profile_url"] = _profile_url(p_name)
+                    results["bat"][category] = rows
             except: continue
             
     # Load Bowling Stats
@@ -662,7 +687,13 @@ def api_stats(year):
             category = csv_file.stem.replace("_", " ").title()
             try:
                 with open(csv_file, newline="", encoding="utf-8") as f:
-                    results["bowl"][category] = list(csv.DictReader(f))
+                    rows = list(csv.DictReader(f))
+                    for r in rows:
+                        p_name = r.get("PLAYER") or r.get("BATTER") or r.get("BOWLER", "")
+                        asset = PLAYER_ASSETS.get(_name_key(p_name), {})
+                        r["img"] = asset.get("img", "")
+                        r["profile_url"] = _profile_url(p_name)
+                    results["bowl"][category] = rows
             except: continue
             
     return jsonify(results)

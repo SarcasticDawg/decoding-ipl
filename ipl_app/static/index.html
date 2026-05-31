@@ -1068,26 +1068,29 @@ function renderStatsTable(rows, cat, isBowling) {
   html += `</tr></thead><tbody>`;
   
   rows.forEach((row, rowIdx) => {
-    const isFirstRow = rowIdx === 0;
-    html += `<tr style="${isFirstRow ? 'background: rgba(244,168,40,0.08);' : ''}">`;
-    headers.forEach(h => {
-      let val = row[h] || '0';
-      const hUpper = h.toUpperCase();
-      const isName = nameKeys.includes(hUpper);
-      const isHighlight = ['RUNS', 'WKTS', 'SR', 'AVG', '6S', '4S', 'BBI', 'ECON'].includes(hUpper);
-      
-      let style = '';
-      if (isFirstRow) {
-        style = isName ? 'color: var(--accent); font-weight: 800;' : 'color: var(--accent); font-weight: 700;';
-      } else if (isHighlight) {
-        style = 'color: rgba(232,234,240,0.9);';
-      }
-      
-      html += `<td style="${style}">${val}</td>`;
-    });
-    html += `</tr>`;
+  const isFirstRow = rowIdx === 0;
+  html += `<tr style="${isFirstRow ? 'background: rgba(244,168,40,0.08);' : ''}">`;
+  headers.forEach(h => {
+    let val = row[h] || '0';
+    const hUpper = h.toUpperCase();
+    const isName = nameKeys.includes(hUpper);
+    const isHighlight = ['RUNS', 'WKTS', 'SR', 'AVG', '6S', '4S', 'BBI', 'ECON'].includes(hUpper);
+
+    let style = '';
+    if (isFirstRow) {
+      style = isName ? 'color: var(--accent); font-weight: 800;' : 'color: var(--accent); font-weight: 700;';
+    } else if (isHighlight) {
+      style = 'color: rgba(232,234,240,0.9);';
+    }
+
+    if (isName) {
+      val = playerLink(row);
+    }
+
+    html += `<td style="${style}">${val}</td>`;
   });
-  
+  html += `</tr>`;
+  });  
   html += `</tbody></table>`;
   $("stats-container-main").innerHTML = html;
 }
@@ -1671,7 +1674,7 @@ function renderAdvanced(a) {
       <tbody>`;
   players.forEach(p => {
     playerHTML += `<tr>
-      <td>${p.name}</td>
+      <td>${playerLink(p)}</td>
       <td>${signedPct(p.batting_wp)}</td>
       <td>${signedPct(p.bowling_wp)}</td>
       <td>${signedPct(p.fielding_wp)}</td>
