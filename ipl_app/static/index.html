@@ -357,12 +357,16 @@
   }
   .scorecard-table td:first-child { color: #0058d8; font-weight: 650; }
   .player-link {
-    color: #0058d8;
+    color: var(--accent);
     text-decoration: none;
     font-weight: 800;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
   }
   .player-link:hover {
     text-decoration: underline;
+    color: #fff;
   }
   .scorecard-table .dismissal { color: #59616d; font-size: 11px; font-weight: 500; margin-left: 10px; }
   .scorecard-summary {
@@ -1208,13 +1212,15 @@ function renderImpactLeaderboard(players) {
   const maxScore = players[0].rating;
   $("impact-container-main").innerHTML = players.map((p, i) => {
     const pct = Math.round((p.rating / maxScore) * 100);
-    const imgHtml = p.team_logo ? `<img src="${p.team_logo}" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">` : "";
+    const teamLogo = p.team_logo ? `<img src="${p.team_logo}" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;">` : "";
+    const photo = p.img ? `<img src="${p.img}" style="width:40px;height:40px;border-radius:50%;margin-bottom:10px;border:1px solid var(--accent);object-fit:cover;">` : "";
     
     return `
       <div class="impact-card ${i === 0 ? "motm" : ""}">
         <div class="card-rank">#${i+1} · ${p.role}</div>
-        <div class="card-name">${p.name}</div>
-        <div class="card-team">${imgHtml}${p.team} · ${p.matches} matches</div>
+        ${photo}
+        <div class="card-name">${playerLink(p)}</div>
+        <div class="card-team">${teamLogo}${p.team} · ${p.matches} matches</div>
         <div class="card-score-row">
           <div class="card-score-num">${p.rating.toFixed(1)}</div>
           <div class="card-score-label">/10</div>
@@ -1457,10 +1463,13 @@ function renderResult(d) {
     const roleCls = p.role === "bat" ? "role-bat" : p.role === "all" ? "role-all" : "role-bowl";
     const roleLabel = p.role === "bat" ? "batting" : p.role === "all" ? "all-round" : "bowling";
     const pct = Math.round((p.score / maxScore) * 100);
+    const photo = p.img ? `<img src="${p.img}" style="width:50px;height:50px;border-radius:50%;margin-bottom:10px;border:2px solid var(--accent);object-fit:cover;">` : "";
+    
     return `
       <div class="impact-card ${isMotm ? "motm" : ""}">
         <div class="card-rank">#${i+1}${isMotm ? " · top impact" : ""}</div>
-        <div class="card-name">${p.name}</div>
+        ${isMotm ? photo : ""}
+        <div class="card-name">${playerLink(p)}</div>
         <div class="card-team">${abbr(p.team)} · <span class="role-badge ${roleCls}">${roleLabel}</span></div>
         <div class="card-score-row">
           <div class="card-score-num">${p.score.toFixed(1)}</div>
@@ -1488,7 +1497,7 @@ function renderResult(d) {
       <tbody>`;
   batters.forEach(p => {
     batHTML += `<tr>
-      <td>${p.name}</td>
+      <td>${playerLink(p)}</td>
       <td class="${p.runs >= 50 ? "stat-highlight" : ""}">${p.runs}</td>
       <td>${p.balls}</td>
       <td>${p.sr}</td>
@@ -1506,7 +1515,7 @@ function renderResult(d) {
   bowlers.forEach(p => {
     const overs = p.balls ? `${Math.floor(p.balls/6)}.${p.balls%6}` : "0";
     bowlHTML += `<tr>
-      <td>${p.name}</td>
+      <td>${playerLink(p)}</td>
       <td class="${p.wkts >= 3 ? "stat-highlight" : ""}">${p.wkts}</td>
       <td>${p.bowl_runs ?? "—"}</td>
       <td>${overs}</td>

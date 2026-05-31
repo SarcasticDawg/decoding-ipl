@@ -478,7 +478,24 @@ def compute_impact(match_id: str):
         runs, wkts = b.get("runs", 0), bw.get("wickets", 0)
         role = "all" if runs > 20 and wkts > 1 else ("bat" if runs > 15 else "bowl")
         stat = f"{runs}({b.get('balls',0)}) SR:{round(runs/max(b.get('balls',1),1)*100,1)}" if role == "bat" else (f"{wkts}/{bw.get('runs',0)} ({bw.get('balls',0)//6}.{bw.get('balls',0)%6} ov)" if role == "bowl" else f"{runs}r & {wkts}w")
-        all_p.append({"name": name, "score": rating, "total_raw": total, "role": role, "stat": stat, "team": b.get("team") or bw.get("team") or "", "runs": runs, "balls": b.get("balls",0), "wkts": wkts, "fours": b.get("fours",0), "sixes": b.get("sixes",0), "eco": round((bw.get("runs",0)/max(bw.get("balls",1),1))*6, 2) if bw.get("balls") else 0})
+        
+        asset = PLAYER_ASSETS.get(_name_key(name), {})
+        all_p.append({
+            "name": name, 
+            "score": rating, 
+            "total_raw": total, 
+            "role": role, 
+            "stat": stat, 
+            "team": b.get("team") or bw.get("team") or "", 
+            "runs": runs, 
+            "balls": b.get("balls",0), 
+            "wkts": wkts, 
+            "fours": b.get("fours",0), 
+            "sixes": b.get("sixes",0), 
+            "eco": round((bw.get("runs",0)/max(bw.get("balls",1),1))*6, 2) if bw.get("balls") else 0,
+            "img": asset.get("img", ""),
+            "profile_url": _profile_url(name)
+        })
     all_p.sort(key=lambda x: x["total_raw"], reverse=True)
     summary = [dict(team=i["team"], score=f"{i['runs']}/{i['wickets']}", overs=f"{i['balls']//6}.{i['balls']%6}") for i in innings_out]
     if by.get("runs"): res = f"{winner} won by {by['runs']} runs"
@@ -589,7 +606,8 @@ def compute_seasonal_impact(year):
                 "team": data["team"],
                 "team_logo": team_logo,
                 "img": asset.get("img", ""),
-                "role": asset.get("role", "Player")
+                "role": asset.get("role", "Player"),
+                "profile_url": _profile_url(name)
             })
             
         return sorted(results, key=lambda x: x["rating"], reverse=True)[:50]
